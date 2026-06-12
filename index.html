@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Resource Discovery & Intelligence Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+:root {
+  --bg: #0B0C0E;
+  --surface: #15171A;
+  --surface-2: #1B1D21;
+  --border: #26282C;
+  --text-hi: #EDEEF0;
+  --text-mid: #9498A0;
+  --text-low: #5C6066;
+  --accent: #6E5BFF;
+  --accent-dim: #2A2550;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text-hi);
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.mono { font-family: 'JetBrains Mono', monospace; font-weight: 400; }
+
+/* Header */
+.header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 28px; border-bottom: 1px solid var(--border);
+}
+.header__left { display: flex; align-items: center; gap: 12px; }
+.header__mark {
+  width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent); background: var(--accent-dim);
+}
+.header__title { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 500; }
+.header__sub { color: var(--text-low); font-size: 11px; margin-top: 2px; }
+.header__nav { display: flex; gap: 24px; font-size: 12px; }
+.header__link { color: var(--text-mid); text-decoration: none; }
+.header__status { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-low); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-low); }
+.dot--ok { background: #5FE3A1; }
+.dot--running { background: var(--accent); animation: pulse 1.1s ease-in-out infinite; }
+.dot--err { background: #FF7A7A; }
+@keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+/* Main */
+.main { max-width: 1240px; margin: 0 auto; padding: 32px 28px 60px; }
+
+/* Seed bar */
+.seedbar {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.seedbar__label { color: var(--text-low); font-size: 11px; letter-spacing: 0.12em; flex-shrink: 0; }
+.seedbar__input-wrap {
+  flex: 1; min-width: 220px; display: flex; align-items: center; gap: 10px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 9px 12px;
+}
+.seedbar__input {
+  background: transparent; border: none; outline: none; color: var(--text-hi);
+  font-size: 13px; width: 100%; font-family: 'JetBrains Mono', monospace;
+}
+.seedbar__input::placeholder { color: var(--text-low); }
+.seedbar__opts { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--text-low); }
+.seedbar__opts input {
+  width: 48px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text-hi); padding: 6px 6px; font-family: 'JetBrains Mono', monospace; font-size: 11px; text-align: center;
+}
+.seedbar__button {
+  display: flex; align-items: center; gap: 8px; background: var(--accent); color: #fff;
+  border: none; border-radius: 6px; padding: 10px 18px; font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: opacity 0.15s; flex-shrink: 0;
+}
+.seedbar__button:hover { opacity: 0.88; }
+.seedbar__button:disabled { opacity: 0.55; cursor: default; }
+.errorbar {
+  background: #2A1418; border: 1px solid #4A2228; color: #FF9D9D; border-radius: 8px;
+  padding: 10px 14px; font-size: 12px; margin-bottom: 14px; font-family: 'JetBrains Mono', monospace;
+}
+
+/* Stat strip */
+.statstrip {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+  background: var(--border); border: 1px solid var(--border); border-radius: 10px;
+  overflow: hidden; margin-bottom: 20px;
+}
+.statstrip__item { background: var(--surface); padding: 16px 20px; }
+.statstrip__value { font-family: 'Fraunces', serif; font-size: 28px; font-weight: 500; color: var(--text-hi); }
+.statstrip__label { color: var(--text-low); font-size: 11px; margin-top: 4px; }
+
+/* Crawl trace */
+.trace { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); margin-bottom: 24px; overflow: hidden; }
+.trace__head {
+  width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  background: transparent; border: none; color: var(--text-mid); cursor: pointer; font-size: 12px;
+}
+.trace__count { color: var(--text-low); margin-left: auto; margin-right: 8px; font-size: 11px; }
+.trace__body { border-top: 1px solid var(--border); padding: 4px 16px 12px; max-height: 280px; overflow-y: auto; }
+.trace__row {
+  display: grid; grid-template-columns: 80px 16px 1.2fr 1fr 32px; align-items: center; gap: 10px;
+  padding: 5px 0; font-size: 12px;
+}
+.trace__depth { color: var(--text-low); white-space: pre; font-size: 11px; }
+.trace__status { text-align: center; font-size: 11px; }
+.trace__status--seed, .trace__status--done { color: var(--accent); }
+.trace__status--found { color: #5FE3A1; }
+.trace__status--skip { color: var(--text-low); }
+.trace__status--error { color: #FF7A7A; }
+.trace__url { color: var(--text-hi); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'JetBrains Mono', monospace; }
+.trace__note { color: var(--text-mid); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trace__d { color: var(--text-low); font-size: 10px; text-align: right; }
+.trace__empty { color: var(--text-low); font-size: 12px; padding: 12px 0; }
+
+/* Layout */
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 24px; }
+.layout__side { display: flex; flex-direction: column; gap: 16px; }
+
+/* Category filter */
+.catfilter { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.catfilter__head {
+  display: flex; align-items: center; gap: 8px; padding: 12px 14px; font-size: 11px;
+  letter-spacing: 0.1em; color: var(--text-low); border-bottom: 1px solid var(--border);
+}
+.catfilter__list { padding: 6px; display: flex; flex-direction: column; }
+.catfilter__item {
+  display: flex; align-items: center; justify-content: space-between; padding: 8px 10px;
+  border-radius: 6px; background: transparent; border: none; color: var(--text-mid);
+  font-size: 12.5px; cursor: pointer; text-align: left; transition: background 0.12s, color 0.12s;
+}
+.catfilter__item:hover { background: var(--surface-2); color: var(--text-hi); }
+.catfilter__item.is-active { background: var(--accent-dim); color: var(--text-hi); }
+.catfilter__item-left { display: flex; align-items: center; gap: 9px; }
+.catfilter__count { color: var(--text-low); font-size: 11px; }
+.catfilter__swatch { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+/* Graph panel */
+.graphpanel { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.graphpanel__head {
+  display: flex; align-items: center; gap: 8px; padding: 12px 14px; font-size: 10.5px;
+  letter-spacing: 0.08em; color: var(--text-low); border-bottom: 1px solid var(--border);
+}
+.graphpanel__list { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; max-height: 320px; overflow-y: auto; }
+.graphpanel__row { display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+.graphpanel__node { color: var(--text-hi); line-height: 1.3; }
+.graphpanel__node--target { color: var(--text-mid); padding-left: 12px; }
+.graphpanel__rel { color: var(--accent); font-size: 10.5px; padding-left: 12px; font-family: 'JetBrains Mono', monospace; }
+.graphpanel__empty { color: var(--text-low); font-size: 12px; }
+
+/* Search row */
+.searchrow {
+  display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); padding: 12px 16px; margin-bottom: 14px;
+}
+.searchrow__input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-hi); font-size: 13.5px; }
+.searchrow__input::placeholder { color: var(--text-low); }
+.searchrow__clear { background: var(--surface-2); border: none; border-radius: 5px; color: var(--text-mid); padding: 4px 8px; cursor: pointer; font-size: 11px; }
+
+.resultshead { color: var(--text-low); font-size: 11.5px; margin-bottom: 12px; padding-left: 2px; }
+
+/* Cards */
+.results { display: flex; flex-direction: column; gap: 10px; }
+.card { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); transition: border-color 0.15s; }
+.card:hover { border-color: #38383F; }
+.card__main { display: flex; gap: 14px; padding: 14px 16px; cursor: pointer; align-items: flex-start; }
+.card__icon {
+  width: 32px; height: 32px; border: 1px solid; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px;
+}
+.card__body { flex: 1; min-width: 0; }
+.card__top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.card__category { font-size: 11px; letter-spacing: 0.04em; font-family: 'JetBrains Mono', monospace; }
+.card__score { font-size: 11px; color: var(--text-mid); background: var(--surface-2); padding: 2px 7px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+.card__title { font-family: 'Fraunces', serif; font-size: 15.5px; font-weight: 500; margin-bottom: 4px; color: var(--text-hi); }
+.card__desc { color: var(--text-mid); font-size: 12.5px; line-height: 1.55; margin-bottom: 10px; }
+.card__footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.card__url { display: flex; align-items: center; gap: 5px; color: var(--text-low); font-size: 11px; font-family: 'JetBrains Mono', monospace; text-decoration: none; }
+.card__url:hover { color: var(--accent); }
+.card__tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag { background: var(--surface-2); color: var(--text-mid); font-size: 10.5px; padding: 2px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; }
+.card__chevron { color: var(--text-low); flex-shrink: 0; margin-top: 6px; transition: transform 0.15s; font-size: 11px; }
+.card__chevron.is-open { transform: rotate(180deg); }
+.card__detail { border-top: 1px solid var(--border); padding: 12px 16px 14px 62px; display: flex; flex-direction: column; gap: 8px; }
+.card__detail-row { display: grid; grid-template-columns: 80px 1fr 40px; align-items: center; gap: 10px; }
+.card__detail-label { color: var(--text-low); font-size: 11px; font-family: 'JetBrains Mono', monospace; }
+.card__detail-val { color: var(--text-mid); font-size: 11px; text-align: right; font-family: 'JetBrains Mono', monospace; }
+.scorebar { height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+.scorebar__fill { height: 100%; border-radius: 2px; }
+
+.empty { color: var(--text-low); text-align: center; padding: 40px 0; font-size: 12.5px; }
+.footer { text-align: center; color: var(--text-low); font-size: 11px; padding: 24px; border-top: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; }
+
+@media (max-width: 880px) {
+  .layout { grid-template-columns: 1fr; }
+  .statstrip { grid-template-columns: repeat(2, 1fr); }
+  .header__nav { display: none; }
+  .trace__row { grid-template-columns: 50px 16px 1fr; }
+  .trace__note, .trace__d { display: none; }
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+
+const { useState, useEffect, useRef, useCallback } = React;
+
+const API_BASE = "";  // same-origin
+
+const CATEGORY_META = {
+  research_paper:    { label: "Research Papers",    color: "#8B8FFF", icon: "📄" },
+  dataset:           { label: "Datasets",           color: "#5FE3A1", icon: "🗄" },
+  api:               { label: "APIs",               color: "#FFB454", icon: "⚙" },
+  open_source_tool:  { label: "Open Source Tools",  color: "#6E5BFF", icon: "⌥" },
+  scholarship:       { label: "Scholarships",       color: "#FF8FB1", icon: "🎓" },
+  fellowship:        { label: "Fellowships",        color: "#FF8FB1", icon: "★" },
+  internship:        { label: "Internships",        color: "#7FD4FF", icon: "▣" },
+  competition:       { label: "Competitions",       color: "#FFB454", icon: "🏆" },
+  grant:             { label: "Grants",             color: "#5FE3A1", icon: "$" },
+  course:            { label: "Courses",            color: "#7FD4FF", icon: "▤" },
+  learning_resource: { label: "Learning Resources", color: "#7FD4FF", icon: "▥" },
+  documentation:     { label: "Documentation",      color: "#9498A0", icon: "≡" },
+  community:         { label: "Communities",        color: "#FF8FB1", icon: "◎" },
+  startup:           { label: "Startups",           color: "#6E5BFF", icon: "▲" },
+  funding:           { label: "Funding",            color: "#5FE3A1", icon: "$" },
+  gov_scheme:        { label: "Gov. Schemes",       color: "#7FD4FF", icon: "▦" },
+  unknown:           { label: "Unclassified",       color: "#5C6066", icon: "?" },
+};
+
+function catMeta(cat) {
+  return CATEGORY_META[cat] || CATEGORY_META.unknown;
+}
+
+async function api(path, opts) {
+  const res = await fetch(API_BASE + path, opts);
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { const j = await res.json(); detail = j.detail || detail; } catch (e) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+function Header({ job }) {
+  let dotClass = "dot";
+  let statusText = "Idle — enter a source to begin";
+  if (job) {
+    if (job.status === "running" || job.status === "pending") {
+      dotClass += " dot--running";
+      statusText = `Crawling… ${job.pages_visited} pages visited`;
+    } else if (job.status === "done") {
+      dotClass += " dot--ok";
+      statusText = `Done — ${job.resources_found} resources, ${job.duplicates_removed} duplicates removed`;
+    } else if (job.status === "failed") {
+      dotClass += " dot--err";
+      statusText = `Failed: ${job.error || "unknown error"}`;
+    }
+  }
+  return (
+    <header className="header">
+      <div className="header__left">
+        <div className="header__mark">◆</div>
+        <div>
+          <div className="header__title">Resource Discovery Engine</div>
+          <div className="header__sub mono">live local pipeline — github api + web crawl</div>
+        </div>
+      </div>
+      <div className="header__status">
+        <span className={dotClass}></span>
+        <span className="mono">{statusText}</span>
+      </div>
+    </header>
+  );
+}
+
+function SeedBar({ value, onChange, maxDepth, onDepthChange, maxPages, onPagesChange, onSubmit, busy }) {
+  return (
+    <div className="seedbar">
+      <div className="seedbar__label mono">SOURCE</div>
+      <div className="seedbar__input-wrap">
+        <input
+          className="seedbar__input"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="https://github.com/owner/repo or any docs/site URL"
+          onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
+        />
+      </div>
+      <div className="seedbar__opts">
+        <span>depth</span>
+        <input type="number" min="0" max="4" value={maxDepth} onChange={(e) => onDepthChange(Number(e.target.value))} />
+        <span>max pages</span>
+        <input type="number" min="1" max="300" value={maxPages} onChange={(e) => onPagesChange(Number(e.target.value))} />
+      </div>
+      <button className="seedbar__button" onClick={onSubmit} disabled={busy}>
+        {busy ? "Crawling…" : "Discover →"}
+      </button>
+    </div>
+  );
+}
+
+function StatStrip({ job }) {
+  const items = [
+    { label: "Pages visited", value: job ? job.pages_visited : 0 },
+    { label: "Resources found", value: job ? job.resources_found : 0 },
+    { label: "Duplicates removed", value: job ? job.duplicates_removed : 0 },
+    { label: "Status", value: job ? job.status : "—", isText: true },
+  ];
+  return (
+    <div className="statstrip">
+      {items.map((it, i) => (
+        <div className="statstrip__item" key={i}>
+          <div className="statstrip__value" style={it.isText ? {fontSize: "16px", fontFamily: "'JetBrains Mono', monospace"} : {}}>
+            {it.isText ? it.value : it.value.toLocaleString()}
+          </div>
+          <div className="statstrip__label mono">{it.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CrawlTrace({ log }) {
+  const [expanded, setExpanded] = useState(true);
+  return (
+    <div className="trace">
+      <button className="trace__head" onClick={() => setExpanded(!expanded)}>
+        <span>▤</span>
+        <span className="mono">Crawl trace</span>
+        <span className="trace__count mono">{log.length} events</span>
+        <span>{expanded ? "▾" : "▸"}</span>
+      </button>
+      {expanded && (
+        <div className="trace__body">
+          {log.length === 0 && <div className="trace__empty mono">No crawl activity yet. Enter a source above and click Discover.</div>}
+          {log.map((entry, i) => (
+            <div className="trace__row" key={i}>
+              <span className="trace__depth mono">{"  ".repeat(entry.depth)}{entry.depth > 0 ? "└─" : ""}</span>
+              <span className={`trace__status trace__status--${entry.status}`}>
+                {entry.status === "seed" && "●"}
+                {entry.status === "found" && "✓"}
+                {entry.status === "skip" && "×"}
+                {entry.status === "error" && "!"}
+                {entry.status === "done" && "■"}
+              </span>
+              <span className="trace__url mono">{entry.url}</span>
+              <span className="trace__note">{entry.note}</span>
+              <span className="trace__d mono">d{entry.depth}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ScoreBar({ value, color }) {
+  return (
+    <div className="scorebar">
+      <div className="scorebar__fill" style={{ width: `${Math.round(value * 100)}%`, background: color }} />
+    </div>
+  );
+}
+
+function ResourceCard({ resource }) {
+  const meta = catMeta(resource.category);
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="card">
+      <div className="card__main" onClick={() => setOpen(!open)}>
+        <div className="card__icon" style={{ color: meta.color, borderColor: meta.color + "33", background: meta.color + "14" }}>
+          {meta.icon}
+        </div>
+        <div className="card__body">
+          <div className="card__top">
+            <span className="card__category mono" style={{ color: meta.color }}>{meta.label}</span>
+            <span className="card__score mono" title="Quality score">{resource.quality_score.toFixed(2)}</span>
+          </div>
+          <div className="card__title">{resource.title}</div>
+          <div className="card__desc">{resource.description || "No description extracted."}</div>
+          <div className="card__footer">
+            <a className="card__url mono" href={resource.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+              ↗ {resource.url}
+            </a>
+            <div className="card__tags">
+              {(resource.tags || []).map((t) => <span className="tag mono" key={t}>{t}</span>)}
+            </div>
+          </div>
+        </div>
+        <span className={`card__chevron ${open ? "is-open" : ""}`}>▾</span>
+      </div>
+      {open && (
+        <div className="card__detail">
+          <div className="card__detail-row">
+            <span className="mono card__detail-label">Authority</span>
+            <ScoreBar value={resource.authority_score} color={meta.color} />
+            <span className="mono card__detail-val">{resource.authority_score.toFixed(2)}</span>
+          </div>
+          <div className="card__detail-row">
+            <span className="mono card__detail-label">Freshness</span>
+            <ScoreBar value={resource.freshness_score} color={meta.color} />
+            <span className="mono card__detail-val">{resource.freshness_score.toFixed(2)}</span>
+          </div>
+          <div className="card__detail-row">
+            <span className="mono card__detail-label">Popularity</span>
+            <ScoreBar value={resource.popularity_score} color={meta.color} />
+            <span className="mono card__detail-val">{resource.popularity_score.toFixed(2)}</span>
+          </div>
+          {resource.extra && resource.extra.stars !== undefined && (
+            <div className="card__detail-row">
+              <span className="mono card__detail-label">GitHub</span>
+              <span className="mono" style={{fontSize: "11px", color: "var(--text-mid)"}}>
+                {resource.extra.stars}★ · {resource.extra.forks} forks · {resource.extra.language || "—"}
+              </span>
+              <span></span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CategoryFilter({ active, onToggle, counts }) {
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const cats = Object.entries(CATEGORY_META).filter(([key]) => counts[key]);
+  return (
+    <div className="catfilter">
+      <div className="catfilter__head mono">▣ CATEGORIES</div>
+      <div className="catfilter__list">
+        <button className={`catfilter__item ${active === null ? "is-active" : ""}`} onClick={() => onToggle(null)}>
+          <span>All resources</span>
+          <span className="mono catfilter__count">{total}</span>
+        </button>
+        {cats.map(([key, meta]) => (
+          <button key={key} className={`catfilter__item ${active === key ? "is-active" : ""}`} onClick={() => onToggle(key)}>
+            <span className="catfilter__item-left">
+              <span className="catfilter__swatch" style={{ background: meta.color }}></span>
+              {meta.label}
+            </span>
+            <span className="mono catfilter__count">{counts[key]}</span>
+          </button>
+        ))}
+        {cats.length === 0 && <div style={{padding: "8px 10px", color: "var(--text-low)", fontSize: "12px"}}>No resources yet</div>}
+      </div>
+    </div>
+  );
+}
+
+function GraphPanel({ edges }) {
+  return (
+    <div className="graphpanel">
+      <div className="graphpanel__head mono">◈ KNOWLEDGE GRAPH — DERIVED RELATIONS</div>
+      <div className="graphpanel__list">
+        {edges.length === 0 && <div className="graphpanel__empty mono">No relations derived yet.</div>}
+        {edges.map((e, i) => (
+          <div className="graphpanel__row" key={i}>
+            <span className="graphpanel__node">{e.source_title}</span>
+            <span className="graphpanel__rel">— {e.relation_type} →</span>
+            <span className="graphpanel__node graphpanel__node--target">{e.target_title}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [seedValue, setSeedValue] = useState("https://github.com/ourresearch/OpenAlex");
+  const [maxDepth, setMaxDepth] = useState(2);
+  const [maxPages, setMaxPages] = useState(40);
+  const [job, setJob] = useState(null);
+  const [log, setLog] = useState([]);
+  const [resources, setResources] = useState([]);
+  const [counts, setCounts] = useState({});
+  const [edges, setEdges] = useState([]);
+  const [activeCategory, setActiveCategory] = useState(null);
+  const [query, setQuery] = useState("");
+  const [error, setError] = useState(null);
+  const pollRef = useRef(null);
+
+  const isBusy = job && (job.status === "pending" || job.status === "running");
+
+  const refreshAll = useCallback(async (jobId) => {
+    try {
+      const [jobData, logData, countsData, edgesData] = await Promise.all([
+        api(`/api/crawl-jobs/${jobId}`),
+        api(`/api/crawl-jobs/${jobId}/log`),
+        api(`/api/crawl-jobs/${jobId}/categories`),
+        api(`/api/crawl-jobs/${jobId}/graph`),
+      ]);
+      setJob(jobData);
+      setLog(logData);
+      setCounts(countsData);
+      setEdges(edgesData);
+
+      const params = new URLSearchParams();
+      if (activeCategory) params.set("category", activeCategory);
+      if (query) params.set("q", query);
+      const resourceData = await api(`/api/crawl-jobs/${jobId}/resources?${params.toString()}`);
+      setResources(resourceData);
+
+      if (jobData.status === "done" || jobData.status === "failed") {
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+      }
+    } catch (e) {
+      setError(e.message);
+    }
+  }, [activeCategory, query]);
+
+  async function handleDiscover() {
+    setError(null);
+    if (!seedValue.trim().match(/^https?:\/\//i)) {
+      setError("Source must be a full URL starting with http:// or https://");
+      return;
+    }
+    try {
+      const newJob = await api("/api/crawl-jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seed_url: seedValue.trim(), max_depth: maxDepth, max_pages: maxPages }),
+      });
+      setJob(newJob);
+      setLog([]);
+      setResources([]);
+      setCounts({});
+      setEdges([]);
+      setActiveCategory(null);
+
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(() => refreshAll(newJob.id), 1500);
+      refreshAll(newJob.id);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  // re-fetch resources when filter/search changes (without re-polling everything)
+  useEffect(() => {
+    if (!job) return;
+    const params = new URLSearchParams();
+    if (activeCategory) params.set("category", activeCategory);
+    if (query) params.set("q", query);
+    api(`/api/crawl-jobs/${job.id}/resources?${params.toString()}`)
+      .then(setResources)
+      .catch((e) => setError(e.message));
+  }, [activeCategory, query, job && job.id]);
+
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  const totalResources = Object.values(counts).reduce((a, b) => a + b, 0);
+
+  return (
+    <div className="app">
+      <Header job={job} />
+      <main className="main">
+        <SeedBar
+          value={seedValue} onChange={setSeedValue}
+          maxDepth={maxDepth} onDepthChange={setMaxDepth}
+          maxPages={maxPages} onPagesChange={setMaxPages}
+          onSubmit={handleDiscover} busy={isBusy}
+        />
+        {error && <div className="errorbar mono">⚠ {error}</div>}
+
+        <StatStrip job={job} />
+        <CrawlTrace log={log} />
+
+        <div className="layout">
+          <aside className="layout__side">
+            <CategoryFilter active={activeCategory} onToggle={setActiveCategory} counts={counts} />
+            <GraphPanel edges={edges} />
+          </aside>
+
+          <section className="layout__content">
+            <div className="searchrow">
+              <span style={{color: "var(--text-low)"}}>⌕</span>
+              <input
+                className="searchrow__input"
+                placeholder='Search discovered resources — title, description, or URL…'
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              {query && <button className="searchrow__clear" onClick={() => setQuery("")}>clear</button>}
+            </div>
+
+            <div className="resultshead mono">
+              {resources.length} {resources.length === 1 ? "resource" : "resources"}
+              {activeCategory && <> in <span style={{ color: catMeta(activeCategory).color }}>{catMeta(activeCategory).label}</span></>}
+              {" "}— sorted by quality score
+            </div>
+
+            <div className="results">
+              {resources.map((r) => <ResourceCard key={r.id} resource={r} />)}
+              {resources.length === 0 && (
+                <div className="empty mono">
+                  {job ? "No resources match this filter yet." : "Enter a GitHub repo, docs site, or any URL above and click Discover."}
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      </main>
+      <footer className="footer">
+        resource-discovery-engine — fastapi · github api · httpx · beautifulsoup · sqlite
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
