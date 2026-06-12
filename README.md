@@ -574,3 +574,5 @@ Meilisearch + Playwright/Crawl4AI) is the production path:
 - **Token-overlap dedup -> embeddings**: `dedup.py`'s `_text_similarity` is
   a drop-in replacement target for cosine similarity over embeddings stored
   in pgvector.
+
+.
